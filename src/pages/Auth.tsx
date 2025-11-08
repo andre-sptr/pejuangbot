@@ -28,8 +28,10 @@ const Auth = () => {
         if (error) throw error;
         toast({
           title: "Berhasil daftar! 🎉",
-          description: "Sekarang kamu bisa login",
+          description: "Silakan login untuk melanjutkan.",
         });
+        setIsSignUp(false);
+        setPassword("");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -60,11 +62,16 @@ const Auth = () => {
     >
       <Card className="w-full max-w-md shadow-xl" style={{ boxShadow: "var(--shadow-glow)" }}>
         <CardHeader className="text-center">
-          <div className="text-5xl mb-4">💬</div>
-          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+          <div className="text-5xl mb-2">💬</div>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
             PejuangBot
+          </h1>
+          <CardTitle className="text-3xl font-bold pt-4">
+            {isSignUp ? "Buat Akun Baru" : "Selamat Datang"}
           </CardTitle>
-          <CardDescription>Temen ngobrol dan bantu belajarmu</CardDescription>
+          <CardDescription>
+            {isSignUp ? "Isi data di bawah untuk mendaftar." : "Login ke akun PejuangBot kamu."}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
@@ -73,7 +80,7 @@ const Auth = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="email@example.com"
+                placeholder="nama@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -90,6 +97,7 @@ const Auth = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
+                className="text-black/60 focus:text-black placeholder:text-black/30"
               />
             </div>
             <Button

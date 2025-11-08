@@ -13,7 +13,10 @@ import { Button } from "@/components/ui/button";
 const Index = () => {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [user, setUser] = useState<any>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Kita tetap menggunakan scrollRef pada komponen ScrollArea
+  const scrollRef = useRef<HTMLDivElement>(null); 
+  
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -28,7 +31,6 @@ const Index = () => {
     selectConversation,
   } = useChat();
 
-  // Check auth
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
@@ -51,7 +53,6 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Theme toggle
   useEffect(() => {
     if (theme === "dark") {
       document.documentElement.classList.add("dark");
@@ -60,12 +61,24 @@ const Index = () => {
     }
   }, [theme]);
 
-  // Auto scroll to bottom
+  // --- 💡 INI PERBAIKAN FINALNYA 💡 ---
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // 1. Cari elemen viewport secara spesifik menggunakan querySelector.
+      //    Ini jauh lebih bisa diandalkan daripada .children[0]
+      const viewport = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement;
+
+      if (viewport) {
+        // 2. Gunakan setTimeout(0) untuk memastikan scroll terjadi 
+        //    setelah DOM selesai di-update oleh React
+        setTimeout(() => {
+          viewport.scrollTop = viewport.scrollHeight;
+        }, 0);
+      }
     }
-  }, [messages]);
+  }, [messages, isLoading]); // 3. Kita tambahkan 'isLoading' sebagai dependensi
+                           //    agar scroll juga terjadi saat 'TypingIndicator' muncul/hilang.
+  // ------------------------------------
 
   const handleNewChat = async () => {
     const newId = await createConversation();
@@ -79,7 +92,6 @@ const Index = () => {
       const newId = await createConversation();
       if (newId) {
         await selectConversation(newId);
-        // Wait a bit for state to update
         setTimeout(() => sendMessage(content), 100);
       }
     } else {
@@ -112,17 +124,16 @@ const Index = () => {
       />
 
       <div className="flex-1 flex flex-col" style={{ background: "var(--gradient-bg)" }}>
-        {/* Header */}
         <div className="p-4 border-b border-border bg-card/50 backdrop-blur-sm flex justify-between items-center">
           <h2 className="font-semibold text-lg">
             {conversations.find((c) => c.id === currentConversationId)?.title || "PejuangBot"}
           </h2>
-          <Button variant="outline" size="sm" onClick={handleLogout}>
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
             Logout
           </Button>
         </div>
 
-        {/* Messages Area */}
+        {/* Pasang scrollRef di sini */}
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           {showWelcome ? (
             <div className="flex items-center justify-center h-full">
@@ -146,33 +157,32 @@ const Index = () => {
           )}
         </ScrollArea>
 
-        {/* Input Area */}
         <div className="p-4 bg-card/50 backdrop-blur-sm border-t border-border">
           <div className="max-w-3xl mx-auto">
             <ChatInput onSend={handleSendMessage} disabled={isLoading} />
             {showWelcome && (
-              <div className="flex gap-2 mt-3 flex-wrap">
+              <div className="flex gap-2 mt-3 flex-wrap justify-center">
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={() => handleSendMessage("Jelasin tentang AI dong!")}
-                  className="text-xs"
+                  className="text-xs rounded-full"
                 >
                   ✨ Jelasin tentang AI dong!
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={() => handleSendMessage("Bantu aku belajar matematika")}
-                  className="text-xs"
+                  className="text-xs rounded-full"
                 >
                   📚 Bantu aku belajar matematika
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={() => handleSendMessage("Kasih motivasi buat hari ini")}
-                  className="text-xs"
+                  className="text-xs rounded-full"
                 >
                   💪 Kasih motivasi
                 </Button>

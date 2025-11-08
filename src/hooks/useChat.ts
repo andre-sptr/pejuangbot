@@ -22,7 +22,6 @@ export const useChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Load conversations
   const loadConversations = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -40,7 +39,6 @@ export const useChat = () => {
     setConversations(data || []);
   }, []);
 
-  // Load messages for current conversation
   const loadMessages = useCallback(async (conversationId: string) => {
     const { data, error } = await supabase
       .from("messages")
@@ -61,7 +59,6 @@ export const useChat = () => {
     })));
   }, []);
 
-  // Create new conversation
   const createConversation = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
@@ -86,14 +83,25 @@ export const useChat = () => {
     return data.id;
   }, [loadConversations, toast]);
 
-  // Send message with AI streaming
   const sendMessage = useCallback(async (content: string) => {
     if (!currentConversationId) return;
+
+    // --- 💡 INI SOLUSINYA (OPTIMISTIC UI) 💡 ---
+    // 1. Buat pesan user versi lokal (optimis)
+    const newUserMessage: Message = {
+      id: Math.random().toString(), // ID sementara untuk React key
+      role: "user",
+      content: content,
+      created_at: new Date().toISOString(),
+    };
+    // 2. Langsung tampilkan pesan user di layar
+    setMessages((prev) => [...prev, newUserMessage]);
+    // ----------------------------------------------
 
     setIsLoading(true);
 
     try {
-      // Save user message
+      // 3. Simpan pesan user ke database (proses ini tetap berjalan)
       const { error: userMsgError } = await supabase
         .from("messages")
         .insert({
@@ -104,7 +112,7 @@ export const useChat = () => {
 
       if (userMsgError) throw userMsgError;
 
-      // Get all messages for context
+      // 4. Ambil riwayat chat *terbaru* dari DB untuk konteks AI
       const { data: allMessages } = await supabase
         .from("messages")
         .select("*")
@@ -116,7 +124,7 @@ export const useChat = () => {
         content: m.content,
       }));
 
-      // Call AI via edge function with streaming
+      // 5. Panggil AI (masih menggunakan API key Supabase)
       const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
       const response = await fetch(CHAT_URL, {
         method: "POST",
@@ -140,6 +148,7 @@ export const useChat = () => {
 
       let buffer = "";
 
+      // 6. Proses streaming respons dari Gemini
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -158,10 +167,11 @@ export const useChat = () => {
 
           try {
             const parsed = JSON.parse(jsonStr);
-            const delta = parsed.choices?.[0]?.delta?.content;
+            // Ambil teks dari format respons Gemini
+            const delta = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+
             if (delta) {
               assistantContent += delta;
-              // Update UI in real-time
               setMessages((prev) => {
                 const lastMsg = prev[prev.length - 1];
                 if (lastMsg?.role === "assistant" && !lastMsg.id) {
@@ -182,12 +192,12 @@ export const useChat = () => {
               });
             }
           } catch (e) {
-            // Incomplete JSON, will be completed in next iteration
+            // JSON tidak lengkap, tunggu iterasi berikutnya
           }
         }
       }
 
-      // Save assistant message to database
+      // 7. Simpan balasan lengkap bot ke DB
       if (assistantContent) {
         await supabase.from("messages").insert({
           conversation_id: currentConversationId,
@@ -196,7 +206,8 @@ export const useChat = () => {
         });
       }
 
-      // Reload messages from DB
+      // 8. Muat ulang chat dari DB untuk "sinkronisasi"
+      // (mengganti ID sementara pesan user dengan ID asli dari DB)
       await loadMessages(currentConversationId);
       await loadConversations();
     } catch (error) {
@@ -206,12 +217,13 @@ export const useChat = () => {
         description: error instanceof Error ? error.message : "Gagal mengirim pesan",
         variant: "destructive",
       });
+      // Jika gagal, hapus pesan optimis tadi
+      setMessages((prev) => prev.filter(m => m.id !== newUserMessage.id));
     } finally {
       setIsLoading(false);
     }
   }, [currentConversationId, loadMessages, loadConversations, toast]);
 
-  // Delete conversation
   const deleteConversation = useCallback(async (id: string) => {
     const { error } = await supabase
       .from("conversations")
@@ -240,13 +252,11 @@ export const useChat = () => {
     });
   }, [currentConversationId, loadConversations, toast]);
 
-  // Select conversation
   const selectConversation = useCallback(async (id: string) => {
     setCurrentConversationId(id);
     await loadMessages(id);
   }, [loadMessages]);
 
-  // Initialize
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
