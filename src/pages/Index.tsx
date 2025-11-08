@@ -9,10 +9,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { User } from "@supabase/supabase-js";
 
 const Index = () => {
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   
   // Kita tetap menggunakan scrollRef pada komponen ScrollArea
   const scrollRef = useRef<HTMLDivElement>(null); 
